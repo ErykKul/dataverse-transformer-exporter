@@ -1,3 +1,5 @@
+This repository is moved to [gdcc/exporter-transformer](https://github.com/gdcc/exporter-transformer) where it will be maintained from now on.
+
 # Transformer (JSON or XML) Exporter for Dataverse
 
 This exporter allows you to have up to 100 exporters using a single pre-built JAR file. You can add new exporters by adding directories into the exporters directory (see the Installation section below) and placing (and editing) the configuration (`config.json`) and the transformation (`transformer.json`, `transformer.py` or `transformer.xsl`, see also the examples below) files in it.
