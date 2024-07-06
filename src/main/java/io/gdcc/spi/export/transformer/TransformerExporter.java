@@ -1,8 +1,10 @@
 package io.gdcc.spi.export.transformer;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
@@ -11,12 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -41,6 +45,7 @@ import io.github.erykkul.json.transformer.Utils;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
+import jakarta.json.JsonReader;
 import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
 import jakarta.json.JsonValue.ValueType;
@@ -56,6 +61,7 @@ import jakarta.json.JsonValue.ValueType;
 // All Exporter implementations must implement this interface or the XMLExporter
 // interface that extends it.
 public class TransformerExporter implements Exporter {
+    private static final String base64 = "base64";
     private static final Logger logger = Logger.getLogger(TransformerFactory.class.getName());
     private static final TransformerFactory factory = TransformerFactory.factory(new NashornScriptEngineFactory());
     private static final PyScriptEngineFactory pyFactory = new PyScriptEngineFactory();
@@ -128,6 +134,7 @@ public class TransformerExporter implements Exporter {
     private boolean isXmlTransformer = false;
     private String pyScript = null;
     private final Config config;
+    private Path outPath;
 
     // These methods provide information about the Exporter to Dataverse
 
@@ -144,12 +151,13 @@ public class TransformerExporter implements Exporter {
      * @param index the index
      */
     public TransformerExporter(final int index) {
+        outPath = null;
         config = config("config.json", index);
         preTransformer = transformer("pre_transformer.json", index);
         if (isXmlTransformer) {
             transformer = null;
             try {
-                final URIResolver uriResolver = getResolver(getOutPath(index));
+                final URIResolver uriResolver = getResolver(outPath);
                 final javax.xml.transform.TransformerFactory xmlTransformerFactory = javax.xml.transform.TransformerFactory
                         .newInstance();
                 xmlTransformerFactory.setURIResolver(uriResolver);
@@ -201,6 +209,14 @@ public class TransformerExporter implements Exporter {
         return config.isAvailableToUsers();
     }
 
+    // Exporters can specify that they require, as input, the output of another
+    // exporter. This is done by providing the name of that format in response to a
+    // call to this method.
+    @Override
+    public Optional<String> getPrerequisiteFormatName() {
+        return Optional.ofNullable(config.getPrerequisiteFormatName());
+    }
+
     // Defines the mime type of the exported format - used when metadata is
     // downloaded, i.e. to trigger an appropriate viewer in the user's browser.
     @Override
@@ -214,32 +230,30 @@ public class TransformerExporter implements Exporter {
     public void exportDataset(final ExportDataProvider dataProvider, final OutputStream outputStream)
             throws ExportException {
         try {
-            final JsonObject datasetJson = dataProvider.getDatasetJson();
-            final JsonObject preTransformed = preTransformer.transform(datasetJson);
             // Write the output format to the output stream.
             if (xmlTransformer != null) {
-                final Source src = new StreamSource(new StringReader(jsonToXml(preTransformed)));
+                final Source src = getPrerequisiteFormatName().isEmpty() ? getInputAsSource(dataProvider)
+                        : getPrerequisiteInputAsSource(dataProvider);
                 xmlTransformer.transform(src, new StreamResult(outputStream));
-            } else {
-                final JsonObjectBuilder job = Json.createObjectBuilder();
-                job.add("datasetJson", datasetJson);
-                job.add("datasetORE", dataProvider.getDatasetORE());
-                job.add("datasetSchemaDotOrg", dataProvider.getDatasetSchemaDotOrg());
-                job.add("datasetFileDetails", dataProvider.getDatasetFileDetails());
-                job.add("preTransformed", preTransformed);
-                job.add("config", config.asJsonValue());
-
-                if (pyScript != null) {
-                    final ScriptEngine engine = pyFactory.getScriptEngine();
-                    engine.put("x", Utils.asObject(job.build()));
-                    engine.put("res", new LinkedHashMap<String, Object>());
-                    engine.eval(pyScript);
-                    final Object res = engine.get("res");
-                    outputStream.write(Utils.asJsonValue(res).toString().getBytes("UTF8"));
-                } else {
-                    final JsonObject transformed = transformer.transform(job.build());
-                    outputStream.write(transformed.toString().getBytes("UTF8"));
+            } else if (pyScript != null) {
+                final ScriptEngine engine = pyFactory.getScriptEngine();
+                final JsonObject input = getPrerequisiteFormatName().isEmpty() ? getInputAsJsonObject(dataProvider)
+                        : getPrerequisiteInputAsJsonObject(dataProvider);
+                engine.put("x", Utils.asObject(input));
+                if (outPath != null) {
+                    engine.put("path", outPath.toAbsolutePath().toString());
                 }
+                engine.put("res", new LinkedHashMap<String, Object>());
+                engine.eval(pyScript);
+                final Object res = engine.get("res");
+                final byte[] bytes = res instanceof String ? ((String) res).getBytes("UTF8")
+                        : toBytes(Utils.asJsonValue(res));
+                outputStream.write(bytes);
+            } else {
+                final JsonObject input = getPrerequisiteFormatName().isEmpty() ? getInputAsJsonObject(dataProvider)
+                        : getPrerequisiteInputAsJsonObject(dataProvider);
+                final JsonObject transformed = transformer.transform(input);
+                outputStream.write(transformed.toString().getBytes("UTF8"));
             }
             // Flush the output stream - The output stream is automatically closed by
             // Dataverse and should not be closed in the Exporter.
@@ -249,6 +263,49 @@ public class TransformerExporter implements Exporter {
             logger.severe("transformation failed: " + e);
             throw new ExportException("Unknown exception caught during JSON export.");
         }
+    }
+
+    private Source getInputAsSource(final ExportDataProvider dataProvider) {
+        final JsonObject datasetJson = dataProvider.getDatasetJson();
+        final JsonObject preTransformed = preTransformer.transform(datasetJson);
+        return new StreamSource(new StringReader(jsonToXml(preTransformed)));
+    }
+
+    private JsonObject getInputAsJsonObject(final ExportDataProvider dataProvider) {
+        final JsonObject datasetJson = dataProvider.getDatasetJson();
+        final JsonObject preTransformed = preTransformer.transform(datasetJson);
+        final JsonObjectBuilder job = Json.createObjectBuilder();
+        job.add("datasetJson", datasetJson);
+        job.add("datasetORE", dataProvider.getDatasetORE());
+        job.add("datasetSchemaDotOrg", dataProvider.getDatasetSchemaDotOrg());
+        job.add("datasetFileDetails", dataProvider.getDatasetFileDetails());
+        job.add("preTransformed", preTransformed);
+        job.add("config", config.asJsonValue());
+        if (outPath != null) {
+            job.add("path", outPath.toAbsolutePath().toString());
+        }
+        return job.build();
+    }
+
+    private byte[] toBytes(final JsonValue value) throws UnsupportedEncodingException {
+        if (Utils.isObject(value) && value.asJsonObject().size() == 1 && value.asJsonObject().containsKey(base64)) {
+            return Base64.getDecoder().decode(value.asJsonObject().getString(base64));
+        }
+        return value.toString().getBytes("UTF8");
+    }
+
+    private Source getPrerequisiteInputAsSource(final ExportDataProvider dataProvider) {
+        return new StreamSource(dataProvider.getPrerequisiteInputStream().get());
+    }
+
+    private JsonObject getPrerequisiteInputAsJsonObject(final ExportDataProvider dataProvider) throws IOException {
+        final byte[] bytes = dataProvider.getPrerequisiteInputStream().get().readAllBytes();
+        try (final JsonReader jsonReader = Json.createReader(new ByteArrayInputStream(bytes))) {
+            return jsonReader.readObject();
+        } catch (final Exception ignore) {
+        }
+        final String encoded = Base64.getEncoder().encodeToString(bytes);
+        return Json.createObjectBuilder().add(base64, encoded).build();
     }
 
     private URIResolver getResolver(final Path outPath) {
@@ -282,7 +339,6 @@ public class TransformerExporter implements Exporter {
         } catch (final Exception e) {
             try {
                 // on the server:
-                final Path outPath = getOutPath(index);
                 return factory.createFromJsonString(Files.readString(outPath.resolve(fileName)), outPath.toString());
             } catch (final Exception e3) {
                 logger.severe("transformer creation failed (using identity transformer): " + e3);
@@ -299,7 +355,8 @@ public class TransformerExporter implements Exporter {
         } catch (final Exception e) {
             try {
                 // on the server:
-                final String jsoString = Files.readString(getOutPath(index).resolve(fileName));
+                outPath = getOutPath(index);
+                final String jsoString = Files.readString(outPath.resolve(fileName));
                 return new Config(jsoString);
             } catch (final Exception e3) {
                 logger.severe("reading config failed (using using default config): " + e3);

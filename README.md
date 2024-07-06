@@ -1,6 +1,4 @@
-This repository is moved to [gdcc/exporter-transformer](https://github.com/gdcc/exporter-transformer) where it will be maintained from now on.
-
-# Transformer (JSON or XML) Exporter for Dataverse
+# Transformer Exporter for Dataverse
 
 This exporter allows you to have up to 100 exporters using a single pre-built JAR file. You can add new exporters by adding directories into the exporters directory (see the Installation section below) and placing (and editing) the configuration (`config.json`) and the transformation (`transformer.json`, `transformer.py` or `transformer.xsl`, see also the examples below) files in it.
 
@@ -8,11 +6,11 @@ Supported Dataverse versions: 6.0 - recent.
 
 ## Installation
 
-If you haven’t already configured it, set the [dataverse-spi-exporters-directory](https://guides.dataverse.org/en/latest/installation/config.html#dataverse-spi-exporters-directory) configuration value first. Then navigate to the configured directory and download the [JAR file](https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.3/dataverse-transformer-exporter-1.0.3-jar-with-dependencies.jar) together with the examples you want to try out:
+If you haven’t already configured it, set the [dataverse-spi-exporters-directory](https://guides.dataverse.org/en/latest/installation/config.html#dataverse-spi-exporters-directory) configuration value first. Then navigate to the configured directory and download the [JAR file](https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.5/dataverse-transformer-exporter-1.0.5-jar-with-dependencies.jar) together with the examples you want to try out:
 
 ```shell
 # download the jar
-wget -O transformer-exporter-1.0.3.jar https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.3/dataverse-transformer-exporter-1.0.3-jar-with-dependencies.jar
+wget -O transformer-exporter-1.0.5.jar https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.5/dataverse-transformer-exporter-1.0.5-jar-with-dependencies.jar
 # download the hello-world example
 mkdir hello-world
 wget -O hello-world/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/hello-world/config.json
@@ -21,46 +19,7 @@ wget -O hello-world/transformer.json https://raw.githubusercontent.com/erykkul/d
 mkdir debug
 wget -O debug/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug/config.json
 wget -O debug/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug/transformer.json
-# download the short-example example
-mkdir short-example
-wget -O short-example/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/short-example/config.json
-wget -O short-example/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/short-example/transformer.json
-# download the javascript-transformer example
-mkdir javascript-transformer
-wget -O javascript-transformer/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/javascript-transformer/config.json
-wget -O javascript-transformer/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/javascript-transformer/transformer.json
-mkdir javascript-transformer/js
-wget -O javascript-transformer/js/short_example.js https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/javascript-transformer/js/short_example.js
-# download the croissant example
-mkdir croissant
-wget -O croissant/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/croissant/config.json
-wget -O croissant/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/croissant/transformer.json
-mkdir croissant/js
-wget -O croissant/js/croissant.js https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/croissant/js/croissant.js
-# download the basic-ro-crate example
-mkdir basic-ro-crate
-wget -O basic-ro-crate/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/basic-ro-crate/config.json
-wget -O basic-ro-crate/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/basic-ro-crate/transformer.json
-# download the generated-with-python example
-mkdir generated-with-python
-wget -O generated-with-python/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/generated-with-python/config.json
-wget -O generated-with-python/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/generated-with-python/transformer.json
-# download the debug-xml example
-mkdir debug-xml
-wget -O debug-xml/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug-xml/config.json
-wget -O debug-xml/transformer.xsl https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug-xml/transformer.xsl
-# download the short-example-xml example
-mkdir short-example-xml
-wget -O short-example-xml/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/short-example-xml/config.json
-wget -O short-example-xml/transformer.xsl https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/short-example-xml/transformer.xsl
-# download the debug-py example
-mkdir debug-py
-wget -O debug-py/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug-py/config.json
-wget -O debug-py/transformer.py https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug-py/transformer.py
-# download the short-example-py example
-mkdir short-example-py
-wget -O short-example-py/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/short-example-py/config.json
-wget -O short-example-py/transformer.py https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/short-example-py/transformer.py
+# etc.
 ```
 
 After restarting the Dataverse, you should be able to use the newly installed exporters (next to the internal exporters):
@@ -138,6 +97,14 @@ This exporter is identical to the Debug example in its output (the only differen
 ### Short example written in Python
 
 This exporter copies only the title, the author names and the filenames of the dataset version, and outputs them in a JSON document. It is written in Python.
+
+### HTML example written in Python
+
+This exporter takes JSON input from a prerequisite exporter (`short_example_py` by default), and displays it as HTML. It is written in Python. In order to change the JSON input for this exporter, change the `prerequisiteFormatName` value in the `config.json` to the format name of the exporter you wish to use as input.
+
+### DDI PDF codebook
+
+This exporter is entirely based on the [DDI PDF Exporter](https://github.com/gdcc/exporter-ddipdf). It is simply a port of that exporter into Python (Jython). It illustrates how to convert XML input to PDF in an exporter.
 
 ## Developer guide
 
