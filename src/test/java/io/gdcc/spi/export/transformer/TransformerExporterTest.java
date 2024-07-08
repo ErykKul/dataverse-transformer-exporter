@@ -20,10 +20,13 @@ import javax.script.ScriptEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory;
 import org.python.google.common.io.Files;
 import org.python.jsr223.PyScriptEngineFactory;
 
 import io.gdcc.spi.export.ExportDataProvider;
+import io.github.erykkul.json.transformer.Transformer;
+import io.github.erykkul.json.transformer.TransformerFactory;
 import io.github.erykkul.json.transformer.Utils;
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
@@ -116,7 +119,6 @@ public class TransformerExporterTest {
     public void testExportDataset() throws Exception {
         transformerExporter.exportDataset(dataProvider, outputStream);
         final String expected = parse("result.json").toString();
-        System.out.println(outputStream.toString());
         final JsonReader jsonReader = Json.createReader(new StringReader(outputStream.toString()));
         final JsonObject actual = jsonReader.readObject();
         jsonReader.close();
@@ -153,5 +155,32 @@ public class TransformerExporterTest {
         final Object res = engine.get("res");
         final byte[] decoded = Base64.getDecoder().decode(Utils.asJsonValue(res).asJsonObject().getString("base64"));
         Files.write(decoded, new File("/home/eryk/projects/exporter-transformer/src/test/resources/fop/output.pdf"));
+    }
+
+    // example based on https://repo.researchdata.hu/dataset.xhtml?persistentId=hdl:21.15109/ARP/PCKHRH
+    @Test
+    public void testArpPythonScript() throws Exception {
+        final InputStream pyScriptStream = TransformerExporterTest.class.getClassLoader()
+                .getResourceAsStream("arp/transformer.py");
+        final String pyScript = new String(pyScriptStream.readAllBytes(), StandardCharsets.UTF_8);
+        final ScriptEngine engine = new PyScriptEngineFactory().getScriptEngine();
+        engine.put("x", Utils.asObject(parse("arp/input.json")));
+        engine.put("path",
+                TransformerExporterTest.class.getClassLoader().getResource(".").getPath().toString() + "arp");
+        engine.put("res", new LinkedHashMap<String, Object>());
+        engine.eval(pyScript);
+        final Object res = engine.get("res");
+        final String expected = parse("arp/result.json").toString();
+        assertEquals(expected.trim(), Utils.asJsonValue(res).toString().trim());
+    }
+
+    @Test
+    public void testPreTransformer() throws Exception {
+        final TransformerFactory factory = TransformerFactory.factory(new NashornScriptEngineFactory());
+        final String pathStr = TransformerExporterTest.class.getClassLoader().getResource(".").getPath().toString() + "pretransform";
+        final Transformer t = factory.createFromFile(pathStr + "/pre_transformer.json", pathStr);
+        final JsonObject res = t.transform(parse("pretransform/input.json"));
+        final String expected = parse("pretransform/result.json").toString();
+        assertEquals(expected.trim(), res.toString().trim());
     }
 }

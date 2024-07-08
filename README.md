@@ -8,19 +8,19 @@ Supported Dataverse versions: 6.0 - recent.
 
 ## Installation
 
-If you haven’t already configured it, set the [dataverse-spi-exporters-directory](https://guides.dataverse.org/en/latest/installation/config.html#dataverse-spi-exporters-directory) configuration value first. Then navigate to the configured directory and download the [JAR file](https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.6/dataverse-transformer-exporter-1.0.6-jar-with-dependencies.jar) together with the examples you want to try out:
+If you haven’t already configured it, set the [dataverse-spi-exporters-directory](https://guides.dataverse.org/en/latest/installation/config.html#dataverse-spi-exporters-directory) configuration value first. Then navigate to the configured directory and download the [JAR file](https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.7/dataverse-transformer-exporter-1.0.7-jar-with-dependencies.jar) together with the examples you want to try out:
 
 ```shell
 # download the jar
-wget -O transformer-exporter-1.0.6.jar https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.6/dataverse-transformer-exporter-1.0.6-jar-with-dependencies.jar
+wget -O transformer-exporter-1.0.7.jar https://repo1.maven.org/maven2/io/github/erykkul/dataverse-transformer-exporter/1.0.7/dataverse-transformer-exporter-1.0.7-jar-with-dependencies.jar
 # download the hello-world example
 mkdir hello-world
-wget -O hello-world/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/hello-world/config.json
-wget -O hello-world/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/hello-world/transformer.json
+wget -O hello-world/config.json https://raw.githubusercontent.com/gdcc/exporter-transformer/main/examples/hello-world/config.json
+wget -O hello-world/transformer.json https://raw.githubusercontent.com/gdcc/exporter-transformer/main/examples/hello-world/transformer.json
 # download the debug example
 mkdir debug
-wget -O debug/config.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug/config.json
-wget -O debug/transformer.json https://raw.githubusercontent.com/erykkul/dataverse-transformer-exporter/main/examples/debug/transformer.json
+wget -O debug/config.json https://raw.githubusercontent.com/gdcc/exporter-transformer/main/examples/debug/config.json
+wget -O debug/transformer.json https://raw.githubusercontent.com/gdcc/exporter-transformer/main/examples/debug/transformer.json
 # etc.
 ```
 
@@ -108,6 +108,10 @@ This exporter takes JSON input from a prerequisite exporter (`short_example_py` 
 
 This exporter is entirely based on the [DDI PDF Exporter](https://github.com/gdcc/exporter-ddipdf). It is simply a port of that exporter into Python (Jython). It illustrates how to convert XML input to PDF in an exporter.
 
+### ARP RO-Crate
+
+This exporter is entirely based on the [Dataverse PR 10086](https://github.com/IQSS/dataverse/pull/10086). It is simply a port of that exporter into Python (Jython).
+
 ## Developer guide
 
 The easiest way to start is to write JavasCript code. You can use the provided [Croissant](/examples/croissant/js/croissant.js) code as the start point. You will need to restart the server after changing that code. Note that the exporters use caching, you will need to either to wait until the cache is expired or delete the cached exporter output manually to see the changes.
@@ -132,11 +136,11 @@ mvn test -Dtest="TransformerExporterTest#testPythonScript"
 You can start by changing the code in the [transformer.py](/src/test/resources/transformer.py), shown below, and testing your code until the desired outcome is achieved (see also [py-input.json](/src/test/resources/py-input.json) and [py-result.json](/src/test/resources/py-result.json)). When you are done, just place the new `transformer.py` together with a `config.json` files in a new folder in the exporters directory (make sure that the transformer-exporter JAR file is also placed in the exporters directory). After restarting the server, your new exporter should be ready to use.
 
 ```py
-res["title"] = x["preTransformed"]["datasetVersion"]["metadataBlocks"]["citation"]["title"][0]
+res["title"] = x["preTransformed"]["datasetVersion"]["metadataBlocks"]["citation"]["title"]
 
 res["author"] = []
 for author in x["preTransformed"]["datasetVersion"]["metadataBlocks"]["citation"]["author"]:
-    res["author"].append(author["authorName"][0])
+    res["author"].append(author["authorName"])
 
 res["files"] = []
 for distribution in x["datasetSchemaDotOrg"]["distribution"]:
